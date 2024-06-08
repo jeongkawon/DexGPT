@@ -14,7 +14,7 @@ import dotenv
 dotenv.load_dotenv()
 
 
-st.title("DexDLab GPT")
+st.title("DexDLab GPT2")
 
 with st.sidebar:
     uploaded_files =  st.file_uploader("Upload your file",type=['pdf','docx'],accept_multiple_files=True)
