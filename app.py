@@ -9,18 +9,42 @@ from langchain.chains import LLMChain
 from langchain.memory import ConversationBufferMemory
 from langchain.chat_models import ChatOpenAI
 import time
+import os
+
+from lib.multi_modal_rag import (
+    extract_pdf_elements,
+    categorize_elements,
+)
 
 import dotenv
 dotenv.load_dotenv()
 
+SAVE_DIR = "uploaded_files/"
 
-st.title("DexDLab GPT2")
+
+st.title("DexDLab GPT")
 
 with st.sidebar:
     uploaded_files =  st.file_uploader("Upload your file",type=['pdf','docx'],accept_multiple_files=True)
     process = st.button("Process")
 if process:
     st.title("haha fun")
+
+    for uploaded_file in uploaded_files:
+
+        st.info(uploaded_file)
+
+        file_path = os.path.join(SAVE_DIR, uploaded_file.name)
+    
+        # 파일 저장
+        with open(file_path, "wb") as f:
+            f.write(uploaded_file.getbuffer())
+
+        # 요소 추출
+        # raw_pdf_elements = extract_pdf_elements(fpath, fname)
+
+        # 텍스트, 테이블 추출
+        # texts, tables = categorize_elements(raw_pdf_elements)
 
 
 # Set a default model

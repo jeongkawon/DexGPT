@@ -2,4 +2,4 @@
 
 
 
-# pip freeze | grep -v -e "pywin32" -e "xxxxx" > requirements.txt
+# pip freeze > requirements.txt
