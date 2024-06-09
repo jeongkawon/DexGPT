@@ -1,3 +1,7 @@
+__import__('pysqlite3')
+import sys
+sys.modules['sqlite3'] = sys.modules.pop('pysqlite3')
+
 import streamlit as st
 from langchain.prompts import (
     ChatPromptTemplate,
@@ -39,7 +43,7 @@ rag_on = st.toggle("멀티모달 RAG 사용하기")
 
 if rag_on:
     with st.sidebar:
-        uploaded_files =  st.file_uploader("Upload your file",type=['pdf','docx'],accept_multiple_files=True)
+        uploaded_files =  st.file_uploader("Upload your file",type=['pdf'],accept_multiple_files=True)
         if len(uploaded_files) > 0:
             process = st.button("업로드한 데이터 등록하기")
         else:
