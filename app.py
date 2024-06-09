@@ -41,10 +41,13 @@ if process:
             f.write(uploaded_file.getbuffer())
 
         # 요소 추출
-        # raw_pdf_elements = extract_pdf_elements(fpath, fname)
+        raw_pdf_elements = extract_pdf_elements(SAVE_DIR, uploaded_file.name)
 
         # 텍스트, 테이블 추출
-        # texts, tables = categorize_elements(raw_pdf_elements)
+        texts, tables = categorize_elements(raw_pdf_elements)
+
+        st.info(texts)
+        st.info(tables)
 
 
 # Set a default model
