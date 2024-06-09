@@ -47,15 +47,22 @@ rag_on = st.toggle("멀티모달 RAG 사용하기")
 
 
 if rag_on:
+
+    if  "messages" in st.session_state and len(st.session_state.messages) == 0:
+        st.session_state.messages.append({"role": "assistant", "content": "테스트에 사용할 pdf 파일을 등록하세요."})
+
+
     with st.sidebar:
         uploaded_files =  st.file_uploader("Upload your file",type=['pdf'],accept_multiple_files=True)
         if len(uploaded_files) > 0:
-            process = st.button("업로드한 데이터 등록하기")
+            process = st.button("업로드한 파일을 RAG 체인에 등록", type="primary", use_container_width=True)
         else:
             process = None
 
         if process:
         # st.title("haha fun")
+
+            progress_bar = st.progress(0)
 
 
             for uploaded_file in uploaded_files:
@@ -71,9 +78,12 @@ if rag_on:
                 with open(file_path, "wb") as f:
                     f.write(uploaded_file.getbuffer())
 
+                
+
                 # 요소 추출
                 st.info("[1/5] PDF에서 텍스트와 테이블을 추출중..")
                 raw_pdf_elements = extract_pdf_elements(SAVE_DIR, uploaded_file.name)
+                progress_bar.progress(20)
 
                 # 텍스트, 테이블 추출
                 texts, tables = categorize_elements(raw_pdf_elements)
@@ -94,11 +104,13 @@ if rag_on:
                 text_summaries, table_summaries = generate_text_summaries(
                     texts_4k_token, tables, summarize_texts=True
                 )
+                progress_bar.progress(40)
 
                 # 이미지 요약 실행
                 st.info("[3/5] 이미지 요약 생성중")
                 fg_path = "figures/"
                 img_base64_list, image_summaries = generate_img_summaries(fg_path)
+                progress_bar.progress(60)
 
                 # 요약을 색인화하기 위해 사용할 벡터 저장소
                 vectorstore = Chroma(
@@ -116,10 +128,12 @@ if rag_on:
                     image_summaries,
                     img_base64_list,
                 )
+                progress_bar.progress(80)
 
                 # RAG 체인 생성
                 st.info("[5/5] RAG 체인 생성")
                 st.session_state.chain_multimodal_rag = multi_modal_rag_chain(retriever_multi_vector_img)
+                progress_bar.progress(100)
 
                 st.info("등록한 문서에대한 RAG 준비가 완료되었습니다. 질문을 입력하세요.")
 
