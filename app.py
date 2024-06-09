@@ -1,4 +1,4 @@
-if 'RUN_MODE' in globals() and RUN_MODE == "CLOUD":
+if ('RUN_MODE' in globals() or 'RUN_MODE' in locals()) and RUN_MODE == "CLOUD":
     __import__('pysqlite3')
     import sys
     sys.modules['sqlite3'] = sys.modules.pop('pysqlite3')
