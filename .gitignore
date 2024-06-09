@@ -1,5 +1,5 @@
 venv/
 venv/*
-figures/*.jpg
-uploaded_files/*.pdf
+# figures/*.jpg
+# uploaded_files/*.pdf
 .env
