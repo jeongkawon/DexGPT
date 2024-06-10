@@ -24,6 +24,8 @@ from IPython.display import HTML, display
 from langchain_core.runnables import RunnableLambda, RunnablePassthrough
 from PIL import Image
 
+from pdf2image import convert_from_path
+
 
 # PDF에서 요소 추출
 def extract_pdf_elements(path, fname):
@@ -296,7 +298,7 @@ def img_prompt_func(data_dict):
         "type": "text",
         "text": (
             "You will be given a mixed of text, tables, and image(s) usually of charts or graphs.\n"
-            "Use this information to provide investment advice related to the user question. Answer in Korean. Do NOT translate company names.\n"
+            "Use this information to provide the advice related to the user question. Answer in Korean. Do NOT translate company names.\n"
             f"User-provided question: {data_dict['question']}\n\n"
             "Text and / or tables:\n"
             f"{formatted_texts}"
@@ -338,3 +340,13 @@ def multi_modal_rag_chain(retriever):
     )
 
     return chain
+
+
+def pdf_to_jpg(pdf_path, output_folder):
+    # Convert PDF to list of images
+    images = convert_from_path(pdf_path)
+
+    # Save each page as a JPG file
+    for i, image in enumerate(images):
+        image_path = os.path.join(output_folder, f"page_{i + 1}.jpg")
+        image.save(image_path, 'JPEG')

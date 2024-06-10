@@ -20,11 +20,14 @@ from lib.multi_modal_rag import (
     generate_img_summaries,
     create_multi_vector_retriever,
     multi_modal_rag_chain,
+    pdf_to_jpg,
 )
 from langchain_text_splitters import CharacterTextSplitter
 from langchain_community.vectorstores import Chroma
 from langchain_core.documents import Document
 from langchain_openai import OpenAIEmbeddings
+
+from pdf2image import convert_from_path
 
 import dotenv
 dotenv.load_dotenv()
@@ -54,10 +57,19 @@ if rag_on:
 
     with st.sidebar:
         uploaded_files =  st.file_uploader("Upload your file",type=['pdf'],accept_multiple_files=True)
+
+        processing_type = st.radio(
+            "파일 프로세싱 방법 선택",
+            ["각 요소별 추출", "전체를 이미지로 변환"],
+            captions = ["텍스트, 이미지, 이미지로 세분화 추출", "성능 개선 테스트중"]
+        )
+
         if len(uploaded_files) > 0:
             process = st.button("업로드한 파일을 RAG 체인에 등록", type="primary", use_container_width=True)
         else:
             process = None
+
+        
 
         if process:
         # st.title("haha fun")
@@ -80,67 +92,103 @@ if rag_on:
 
                 
 
-                # 요소 추출
-                st.info("[1/5] PDF에서 텍스트와 테이블을 추출중..")
-                raw_pdf_elements = extract_pdf_elements(SAVE_DIR, uploaded_file.name)
-                progress_bar.progress(20)
+                if processing_type == "각 요소별 추출":
+                    # 요소 추출
+                    st.info("[1/5] PDF에서 텍스트와 테이블을 추출중..")
+                    raw_pdf_elements = extract_pdf_elements(SAVE_DIR, uploaded_file.name)
+                    progress_bar.progress(20)
 
-                # 텍스트, 테이블 추출
-                texts, tables = categorize_elements(raw_pdf_elements)
+                    # 텍스트, 테이블 추출
+                    texts, tables = categorize_elements(raw_pdf_elements)
 
-                # st.info(texts)
-                # st.info(tables)
+                    # st.info(texts)
+                    # st.info(tables)
 
-                # 선택사항: 텍스트에 대해 특정 토큰 크기 적용
-                text_splitter = CharacterTextSplitter.from_tiktoken_encoder(
-                    chunk_size=4000, chunk_overlap=0  # 텍스트를 4000 토큰 크기로 분할, 중복 없음
-                )
-                joined_texts = " ".join(texts)  # 텍스트 결합
-                texts_4k_token = text_splitter.split_text(joined_texts)
-                # st.info(texts_4k_token)
+                    # 선택사항: 텍스트에 대해 특정 토큰 크기 적용
+                    text_splitter = CharacterTextSplitter.from_tiktoken_encoder(
+                        chunk_size=4000, chunk_overlap=0  # 텍스트를 4000 토큰 크기로 분할, 중복 없음
+                    )
+                    joined_texts = " ".join(texts)  # 텍스트 결합
+                    texts_4k_token = text_splitter.split_text(joined_texts)
+                    # st.info(texts_4k_token)
 
-                # 텍스트, 테이블 요약 가져오기
-                st.info("[2/5] 텍스트, 테이블 요약을 생성중..")
-                text_summaries, table_summaries = generate_text_summaries(
-                    texts_4k_token, tables, summarize_texts=True
-                )
-                progress_bar.progress(40)
+                    # 텍스트, 테이블 요약 가져오기
+                    st.info("[2/5] 텍스트, 테이블 요약을 생성중..")
+                    text_summaries, table_summaries = generate_text_summaries(
+                        texts_4k_token, tables, summarize_texts=True
+                    )
+                    progress_bar.progress(40)
 
-                # 이미지 요약 실행
-                st.info("[3/5] 이미지 요약 생성중")
-                fg_path = "figures/"
-                img_base64_list, image_summaries = generate_img_summaries(fg_path)
-                progress_bar.progress(60)
+                    # 이미지 요약 실행
+                    st.info("[3/5] 이미지 요약 생성중")
+                    fg_path = "figures/"
+                    img_base64_list, image_summaries = generate_img_summaries(fg_path)
+                    progress_bar.progress(60)
 
-                # 요약을 색인화하기 위해 사용할 벡터 저장소
-                vectorstore = Chroma(
-                    collection_name="sample-rag-multi-modal", embedding_function=OpenAIEmbeddings()
-                )
+                    # 요약을 색인화하기 위해 사용할 벡터 저장소
+                    vectorstore = Chroma(
+                        collection_name="sample-rag-multi-modal", embedding_function=OpenAIEmbeddings()
+                    )
 
-                # 검색기 생성
-                st.info("[4/5] 검색기 생성")
-                retriever_multi_vector_img = create_multi_vector_retriever(
-                    vectorstore,
-                    text_summaries,
-                    texts,
-                    table_summaries,
-                    tables,
-                    image_summaries,
-                    img_base64_list,
-                )
-                progress_bar.progress(80)
+                    # 검색기 생성
+                    st.info("[4/5] 검색기 생성")
+                    retriever_multi_vector_img = create_multi_vector_retriever(
+                        vectorstore,
+                        text_summaries,
+                        texts,
+                        table_summaries,
+                        tables,
+                        image_summaries,
+                        img_base64_list,
+                    )
+                    progress_bar.progress(80)
 
-                # RAG 체인 생성
-                st.info("[5/5] RAG 체인 생성")
-                st.session_state.chain_multimodal_rag = multi_modal_rag_chain(retriever_multi_vector_img)
-                progress_bar.progress(100)
+                    # RAG 체인 생성
+                    st.info("[5/5] RAG 체인 생성")
+                    st.session_state.chain_multimodal_rag = multi_modal_rag_chain(retriever_multi_vector_img)
+                    progress_bar.progress(100)
 
-                st.info("등록한 문서에대한 RAG 준비가 완료되었습니다. 질문을 입력하세요.")
+                    st.info("등록한 문서에대한 RAG 준비가 완료되었습니다. 질문을 입력하세요.")
 
-                # query = "몇건의 거래가 있었는지 알려줘"
-                # st.info("질문중")
-                # print(chain_multimodal_rag.invoke(query))
-                # st.info(chain_multimodal_rag.invoke(query))
+                    # query = "몇건의 거래가 있었는지 알려줘"
+                    # st.info("질문중")
+                    # print(chain_multimodal_rag.invoke(query))
+                    # st.info(chain_multimodal_rag.invoke(query))
+
+                else:
+
+                    fg_path = "images/"
+                    pdf_path = SAVE_DIR+uploaded_file.name
+
+                    st.info("[1/4] 이미지로 변환중")
+                    pdf_to_jpg(pdf_path, fg_path)
+                    progress_bar.progress(25)
+
+                    st.info("[2/4] 이미지 요약 생성중")
+                    img_base64_list, image_summaries = generate_img_summaries(fg_path)
+                    progress_bar.progress(50)
+
+
+                    # 요약을 색인화하기 위해 사용할 벡터 저장소
+                    st.info("[3/4] 이미지 요약 생성중")
+                    vectorstore = Chroma(
+                        collection_name="sample-rag-multi-modal", embedding_function=OpenAIEmbeddings()
+                    )
+                    retriever_multi_vector_img = create_multi_vector_retriever(
+                        vectorstore,
+                        [],
+                        [],
+                        [],
+                        [],
+                        image_summaries,
+                        img_base64_list,
+                    )
+                    # RAG 체인 생성
+                    st.info("[4/4] RAG 체인 생성")
+                    st.session_state.chain_multimodal_rag = multi_modal_rag_chain(retriever_multi_vector_img)
+                    progress_bar.progress(100)
+
+                    st.info("등록한 문서에대한 RAG 준비가 완료되었습니다. 질문을 입력하세요.")
 
 
 
