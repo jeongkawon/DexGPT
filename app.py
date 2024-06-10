@@ -62,7 +62,7 @@ if rag_on:
         processing_type = st.radio(
             "파일 프로세싱 방법 선택",
             ["각 요소별 추출", "전체를 이미지로 변환"],
-            captions = ["텍스트, 이미지, 이미지로 세분화 추출", "성능 개선 테스트중"]
+            captions = ["텍스트, 이미지, 이미지로 세분화 추출", "성능 개선을 위한 옵션"]
         )
 
         if len(uploaded_files) > 0:

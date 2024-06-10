@@ -141,7 +141,7 @@ def generate_img_summaries(path):
     # 요약을 위한 프롬프트
     prompt = """You are an assistant tasked with summarizing images for retrieval. \
     These summaries will be embedded and used to retrieve the raw image. \
-    Give a concise summary of the image that is well optimized for retrieval."""
+    Give a detail summary of the image that is well optimized for retrieval."""
 
     # 이미지에 적용
     for img_file in sorted(os.listdir(path)):
