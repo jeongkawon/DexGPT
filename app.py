@@ -183,6 +183,9 @@ if rag_on:
                     img_base64_list, image_summaries = generate_img_summaries(folder_path)
                     progress_bar.progress(50)
 
+                    # st.info(img_base64_list)
+                    # st.info(image_summaries)
+
 
                     # 요약을 색인화하기 위해 사용할 벡터 저장소
                     st.info("[3/4] 이미지 요약 생성중")

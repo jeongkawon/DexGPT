@@ -196,8 +196,8 @@ def create_multi_vector_retriever(
     if table_summaries:
         add_documents(retriever, table_summaries, tables)  
 
-    # if image_summaries:
-    #     add_documents(retriever, image_summaries, images)
+    if image_summaries:
+        add_documents(retriever, image_summaries, images)
 
     return retriever
 
