@@ -12,6 +12,7 @@ from langchain.memory import ConversationBufferMemory
 from langchain.chat_models import ChatOpenAI
 import time
 import os
+from datetime import datetime
 
 from lib.multi_modal_rag import (
     extract_pdf_elements,
@@ -157,15 +158,29 @@ if rag_on:
 
                 else:
 
-                    fg_path = "images/"
+                    image_base_path = "images/"
                     pdf_path = SAVE_DIR+uploaded_file.name
 
+
+                    now = datetime.now()
+                    # 날짜와 시간을 'YYYYMMDD_HHMMSS' 형식으로 포맷팅
+                    folder_name = now.strftime("%Y%m%d_%H%M%S")
+                    # 폴더 경로 생성
+                    folder_path = os.path.join(image_base_path, folder_name)
+                    
+                    # 폴더가 이미 존재하지 않는 경우에만 폴더 생성
+                    if not os.path.exists(folder_path):
+                        os.makedirs(folder_path)
+                        print(f"폴더 생성: {folder_path}")
+                    else:
+                        print(f"폴더가 이미 존재합니다: {folder_path}")
+
                     st.info("[1/4] 이미지로 변환중")
-                    pdf_to_jpg(pdf_path, fg_path)
+                    pdf_to_jpg(pdf_path, folder_path)
                     progress_bar.progress(25)
 
                     st.info("[2/4] 이미지 요약 생성중")
-                    img_base64_list, image_summaries = generate_img_summaries(fg_path)
+                    img_base64_list, image_summaries = generate_img_summaries(folder_path)
                     progress_bar.progress(50)
 
 
