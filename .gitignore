@@ -1,6 +1,6 @@
 venv/
 venv/*
 figures/*.jpg
-images/*.jpg
+# images/*.jpg
 # uploaded_files/*.pdf
 .env
