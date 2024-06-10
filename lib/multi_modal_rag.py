@@ -295,7 +295,6 @@ def img_prompt_func(data_dict):
     text_message = {
         "type": "text",
         "text": (
-            "You are financial analyst tasking with providing investment advice.\n"
             "You will be given a mixed of text, tables, and image(s) usually of charts or graphs.\n"
             "Use this information to provide investment advice related to the user question. Answer in Korean. Do NOT translate company names.\n"
             f"User-provided question: {data_dict['question']}\n\n"
@@ -303,6 +302,18 @@ def img_prompt_func(data_dict):
             f"{formatted_texts}"
         ),
     }
+    # 분석을 위한 텍스트 추가
+    # text_message = {
+    #     "type": "text",
+    #     "text": (
+    #         "You are financial analyst tasking with providing investment advice.\n"
+    #         "You will be given a mixed of text, tables, and image(s) usually of charts or graphs.\n"
+    #         "Use this information to provide investment advice related to the user question. Answer in Korean. Do NOT translate company names.\n"
+    #         f"User-provided question: {data_dict['question']}\n\n"
+    #         "Text and / or tables:\n"
+    #         f"{formatted_texts}"
+    #     ),
+    # }
     messages.append(text_message)
     return [HumanMessage(content=messages)]
 

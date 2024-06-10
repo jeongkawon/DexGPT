@@ -173,7 +173,9 @@ if prompt := st.chat_input("질문을 입력하세요."):
         if rag_on:
             message_placeholder = st.empty()
             if st.session_state.chain_multimodal_rag:
+                print("step 1")
                 full_response = st.session_state.chain_multimodal_rag.invoke(prompt)
+                print("step 2")
             else:
                 full_response = "멀티모드 RAG를 테스트할 파일을 먼저 등록하세요"
             message_placeholder.markdown(full_response)
