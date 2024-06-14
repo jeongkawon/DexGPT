@@ -13,6 +13,7 @@ from langchain.chat_models import ChatOpenAI
 import time
 import os
 from datetime import datetime
+from openai import OpenAI
 
 from lib.multi_modal_rag import (
     extract_pdf_elements,
@@ -30,8 +31,56 @@ from langchain_openai import OpenAIEmbeddings
 
 from pdf2image import convert_from_path
 
+from typing_extensions import override
+from openai import AssistantEventHandler, OpenAI
+
 import dotenv
 dotenv.load_dotenv()
+
+
+client = OpenAI()
+
+
+class EventHandler(AssistantEventHandler):
+    @override
+    def on_text_created(self, text) -> None:
+        print(f"\nassistant > ", end="", flush=True)
+
+    @override
+    def on_tool_call_created(self, tool_call):
+        print(f"\nassistant > {tool_call.type}\n", flush=True)
+
+    @override
+    def on_message_done(self, message) -> None:
+        # print a citation to the file searched
+        message_content = message.content[0].text
+        annotations = message_content.annotations
+        citations = []
+        for index, annotation in enumerate(annotations):
+            message_content.value = message_content.value.replace(
+                annotation.text, f"[{index}]"
+            )
+            if file_citation := getattr(annotation, "file_citation", None):
+                cited_file = client.files.retrieve(file_citation.file_id)
+                citations.append(f"[{index}] {cited_file.filename}")
+
+        message_placeholder = st.empty()
+        message_placeholder.markdown(message_content.value)
+        st.session_state.messages.append({"role": "assistant", "content": message_content.value})
+
+        print(message_content.value)
+        print("\n".join(citations))
+
+
+ 
+assistant = client.beta.assistants.create(
+  name="Analyst Assistant",
+  instructions="You are an expert analyst. Use you knowledge base to answer questions about audited statements. Please answer in Korean",
+  model="gpt-4o",
+  tools=[{"type": "file_search"}],
+)
+
+
 
 
 if os.getenv("RUN_MODE") != "LOCAL":
@@ -60,9 +109,9 @@ if rag_on:
         uploaded_files =  st.file_uploader("Upload your file",type=['pdf'],accept_multiple_files=True)
 
         processing_type = st.radio(
-            "파일 프로세싱 방법 선택",
-            ["각 요소별 추출", "전체를 이미지로 변환"],
-            captions = ["텍스트, 이미지, 이미지로 세분화 추출", "성능 개선을 위한 옵션"]
+            "RAG 방식 선택",
+            ["각 요소별 추출", "전체를 이미지로 변환", "OpenAI API"],
+            captions = ["텍스트, 이미지, 이미지로 세분화 추출", "성능 개선을 위한 옵션", "OpenAI File Search 사용"]
         )
 
         if len(uploaded_files) > 0:
@@ -84,6 +133,7 @@ if rag_on:
                 # st.info(uploaded_file)
 
                 file_path = os.path.join(SAVE_DIR, uploaded_file.name)
+                pdf_path = SAVE_DIR+uploaded_file.name
             
                 # 파일 저장
                 
@@ -156,7 +206,7 @@ if rag_on:
                     # print(chain_multimodal_rag.invoke(query))
                     # st.info(chain_multimodal_rag.invoke(query))
 
-                else:
+                elif processing_type == "전체를 이미지로 변환":
 
                     image_base_path = "images/"
                     pdf_path = SAVE_DIR+uploaded_file.name
@@ -208,8 +258,63 @@ if rag_on:
 
                     st.info("등록한 문서에대한 RAG 준비가 완료되었습니다. 질문을 입력하세요.")
 
+                elif processing_type == "OpenAI API":
+                    
+                    # Create a vector store caled "Financial Statements"
+                    vector_store = client.beta.vector_stores.create(name="Test")
+                    
+                    # Ready the files for upload to OpenAI
+                    file_paths = [pdf_path]
+                    file_streams = [open(path, "rb") for path in file_paths]
+                    
+                    # Use the upload and poll SDK helper to upload the files, add them to the vector store,
+                    # and poll the status of the file batch for completion.
+                    file_batch = client.beta.vector_stores.file_batches.upload_and_poll(
+                        vector_store_id=vector_store.id, files=file_streams
+                    )
+
+                    progress_bar.progress(20)
+                    
+                    # You can print the status and the file counts of the batch to see the result of this operation.
+                    print(file_batch.status)
+                    print(file_batch.file_counts)
+
+                    assistant = client.beta.assistants.update(
+                        assistant_id=assistant.id,
+                        tool_resources={"file_search": {"vector_store_ids": [vector_store.id]}},
+                    )
+
+                    progress_bar.progress(40)
+
+                    # Upload the user provided file to OpenAI
+                    message_file = client.files.create(
+                        file=open(pdf_path, "rb"), purpose="assistants"
+                    )
+                    
+                    progress_bar.progress(60)
 
 
+                    # Create a thread and attach the file to the message
+                    st.session_state.thread = client.beta.threads.create(
+                        messages=[
+                            {
+                            "role": "user",
+                            "content": "이 파일을 바탕으로 답변을 주세요.",
+                            # Attach the new file to the message.
+                            "attachments": [
+                                { "file_id": message_file.id, "tools": [{"type": "file_search"}] }
+                            ],
+                            }
+                        ]
+                    )
+                    progress_bar.progress(100)
+
+                    st.info("등록한 문서에 대한 백터스토어가 준비되었습니다.")
+
+                    print(st.session_state.thread)
+                    
+                    # The thread now has a vector store with that file in its tool resources.
+                    print(st.session_state.thread.tool_resources.file_search)
 
 
 # Set a default model
@@ -222,6 +327,13 @@ if "messages" not in st.session_state:
 if "chain_multimodal_rag" not in st.session_state:
     st.session_state.chain_multimodal_rag = None
     if rag_on: st.info("테스트할 PDF 파일을 업로드 하세요")
+
+
+if "thread" not in st.session_state:
+    st.session_state.thread = None
+    if rag_on: st.info("테스트할 PDF 파일을 업로드 하세요")
+
+
 
 for message in st.session_state.messages:
     with st.chat_message(message["role"]):
@@ -238,13 +350,27 @@ if prompt := st.chat_input("질문을 입력하세요."):
         
         if rag_on:
             message_placeholder = st.empty()
-            if st.session_state.chain_multimodal_rag:
-                print("step 1")
-                full_response = st.session_state.chain_multimodal_rag.invoke(prompt)
-                print("step 2")
+
+
+            if processing_type == "OpenAI API":
+                
+                with client.beta.threads.runs.stream(
+                    thread_id=st.session_state.thread.id,
+                    assistant_id=assistant.id,
+                    instructions=prompt,
+                    event_handler=EventHandler(),
+                ) as stream:
+                    stream.until_done()
+
+            
             else:
-                full_response = "멀티모드 RAG를 테스트할 파일을 먼저 등록하세요"
-            message_placeholder.markdown(full_response)
+                if st.session_state.chain_multimodal_rag:
+                    full_response = st.session_state.chain_multimodal_rag.invoke(prompt)
+                else:
+                    full_response = "멀티모드 RAG를 테스트할 파일을 먼저 등록하세요"
+            
+                message_placeholder.markdown(full_response)
+                st.session_state.messages.append({"role": "assistant", "content": full_response})
 
             
         else:
@@ -277,4 +403,12 @@ if prompt := st.chat_input("질문을 입력하세요."):
 
                 message_placeholder.markdown(full_response + "▌")
             message_placeholder.markdown(full_response)
-    st.session_state.messages.append({"role": "assistant", "content": full_response})
+
+            st.session_state.messages.append({"role": "assistant", "content": full_response})
+
+
+
+
+
+
+
